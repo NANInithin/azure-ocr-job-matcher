@@ -1,0 +1,7 @@
+{
+  "title": "NLP Engineer",
+  "location": "Germany",
+  "minimum_years_experience": 3,
+  "required_skills": ["python", "nlp", "sql", "git"],
+  "preferred_skills": ["fastapi", "docker"]
+}

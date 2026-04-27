@@ -1,0 +1,7 @@
+{
+  "title": "Computer Vision Engineer",
+  "location": "France",
+  "minimum_years_experience": 2,
+  "required_skills": ["python", "pytorch", "opencv", "docker", "computer vision"],
+  "preferred_skills": ["azure", "kubernetes", "cuda", "tensorflow"]
+}

@@ -1,0 +1,5 @@
+Alice Martin
+Berlin, Germany · alice.martin@example.com · github.com/alicemartin
+
+Profile
+Machine learning engineer with experience in NLP, Python, FastAPI, Docker, SQL, and Git.

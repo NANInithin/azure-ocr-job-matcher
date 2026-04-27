@@ -1,0 +1,5 @@
+Computer Vision Engineer
+Location: France
+We are looking for a Computer Vision Engineer with 2+ years of experience.
+Required skills include Python, PyTorch, OpenCV, Docker, and computer vision.
+Preferred skills include Azure, Kubernetes, CUDA, and TensorFlow.

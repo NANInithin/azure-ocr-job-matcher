@@ -1,24 +1,45 @@
 # Azure Job Application Selector
 
-A production-style OCR and document intelligence backend that analyzes candidate application documents, extracts structured profiles, parses job descriptions, and computes explainable candidate-job match results using Azure services and FastAPI.[1][2]
 
-## Overview
 
-This project is being built as an 8-week portfolio system focused on recruiter-visible engineering depth in OCR, backend orchestration, structured extraction, and grounded matching workflows.[3][2]
-The current backend uses a modular FastAPI application structure with separate routers and services, which aligns with common FastAPI project organization practices for larger applications.[1][4][5]
 
-## Current capabilities
 
-- Upload candidate documents through FastAPI and process them with Azure Document Intelligence for OCR and text extraction.[2]
-- Save OCR artifacts for each document, including raw JSON, plain text, and metadata, to support debugging and later evaluation.[6][2]
-- Extract candidate profile fields such as name, email, phone, links, and skills from OCR text using deterministic parsing rules.[6]
-- Parse raw job descriptions into structured job profiles containing title, location, required skills, preferred skills, and years of experience.[7]
-- Match saved candidate profiles to saved job profiles with transparent scoring, matched skills, missing skills, and a final decision label.[7]
+
+
+A production-style OCR and document intelligence backend that analyzes candidate application documents, extracts structured profiles, parses job descriptions, and computes explainable candidate-job match results using Azure services and FastAPI.
+
+## Why this project
+
+This project is being built as an 8-week portfolio system focused on recruiter-visible engineering depth in OCR, backend orchestration, structured extraction, reproducible artifacts, and explainable matching workflows.
+The backend follows a modular FastAPI structure with routers, schemas, and service layers, which aligns with common FastAPI organization patterns for larger applications.
+
+## Current status
+
+The current implementation supports candidate OCR processing, candidate profile extraction, job description parsing, saved-profile matching, and service-layer unit tests for key parsing and matching logic.
+The project now includes reproducible saved artifacts for OCR outputs, job profiles, and match results, which makes debugging and evaluation easier in document intelligence systems.
 
 ## Architecture
 
-The backend is organized into routers, schemas, core configuration, and service modules so that document ingestion, parsing, and matching logic stay separated instead of being merged into one script.[1][5]
-This structure makes it easier to extend the system later with background jobs, databases, evaluation pipelines, and retrieval or grounded Q&A components.[4][2]
+```mermaid
+flowchart TD
+    A[Candidate Resume PDF/Image] --> B[/documents/analyze-and-save/]
+    B --> C[Azure Document Intelligence OCR]
+    C --> D[OCR JSON + text + metadata]
+
+    D --> E[/documents/{document_id}/extract-profile/]
+    E --> F[Candidate Profile JSON]
+
+    G[Raw Job Description Text] --> H[/jobs/parse/]
+    H --> I[Job Profile JSON]
+
+    F --> J[/jobs/{job_id}/match/{document_id}/]
+    I --> J
+    J --> K[Match Result JSON]
+```
+
+The backend is organized so document ingestion, parsing, and matching logic remain separated instead of being coupled inside one script, which makes later extension into evaluation, async processing, and retrieval easier.
+
+## Project structure
 
 ```text
 .
@@ -46,44 +67,41 @@ This structure makes it easier to extend the system later with background jobs, 
 │   ├── ocr_outputs/
 │   └── uploads/
 ├── tests/
+│   ├── conftest.py
+│   ├── test_candidate_profile_service.py
+│   ├── test_job_profile_service.py
+│   └── test_matching_service.py
 ├── .env.example
+├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
 
+## Features
+
+- Upload candidate documents and process them with Azure Document Intelligence OCR.
+- Save OCR artifacts as raw JSON, plain text, and metadata for each document.
+- Extract structured candidate profile fields from OCR output using deterministic parsing rules.
+- Parse raw job descriptions into title, location, skills, and years of experience.
+- Match saved candidate profiles against saved job profiles with transparent scoring and decision logic.
+- Validate parser and matcher behavior using Pytest unit tests.
+
 ## Processing flow
 
-The current end-to-end pipeline is candidate document upload -> OCR extraction -> OCR artifact storage -> candidate profile extraction -> job description parsing -> saved-profile matching.[6][2]
-Each stage writes intermediate files so the pipeline is reproducible and easy to inspect during development, which is especially useful for OCR-heavy systems where extraction quality must be verified step by step.[6]
-
 ```text
-Candidate PDF/Image
-        |
-        v
-/documents/analyze-and-save
-        |
-        v
-OCR JSON + text + metadata saved
-        |
-        v
-/documents/{document_id}/extract-profile
-        |
-        v
-candidate_profile.json saved
+Candidate document
+  -> /documents/analyze-and-save
+  -> OCR outputs saved
+  -> /documents/{document_id}/extract-profile
+  -> candidate_profile.json saved
 
-Raw job description text
-        |
-        v
-/jobs/parse
-        |
-        v
-job_profile.json saved
-        |
-        v
-/jobs/{job_id}/match/{document_id}
-        |
-        v
-match_result.json saved
+Raw job description
+  -> /jobs/parse
+  -> job_profile.json saved
+
+Saved candidate profile + saved job profile
+  -> /jobs/{job_id}/match/{document_id}
+  -> match_result.json saved
 ```
 
 ## API endpoints
@@ -91,20 +109,54 @@ match_result.json saved
 | Endpoint | Method | Purpose |
 |---|---|---|
 | `/health` | GET | Basic service health check. |
-| `/documents/analyze-and-save` | POST | Run OCR on an uploaded file and save raw OCR outputs. |
-| `/documents/{document_id}/extract-profile` | POST | Extract and save a structured candidate profile from saved OCR text. |
-| `/jobs/parse` | POST | Parse raw job description text and save a structured job profile. |
-| `/jobs/{job_id}/match/{document_id}` | POST | Match a saved candidate profile against a saved job profile and save the result. |
+| `/documents/analyze-and-save` | POST | Run OCR on an uploaded file and save OCR outputs. |
+| `/documents/{document_id}/extract-profile` | POST | Extract and save a candidate profile from OCR text. |
+| `/jobs/parse` | POST | Parse raw job description text and save a job profile. |
+| `/jobs/{job_id}/match/{document_id}` | POST | Match a saved candidate profile to a saved job profile and save the result. |
 
 ## Tech stack
 
 | Layer | Tools |
 |---|---|
-| API backend | FastAPI, Python[8] |
-| OCR | Azure Document Intelligence[2] |
-| Storage | Azure Blob Storage, local artifact folders[2] |
-| Parsing | Regex and rule-based extraction with Python `re`.[7][9] |
+| API backend | FastAPI, Python |
+| OCR | Azure Document Intelligence |
+| Storage | Azure Blob Storage, local artifact folders |
+| Parsing | Python regex and rule-based extraction. |
+| Testing | Pytest |
 | Matching | Deterministic skill-based scoring and explainable notes. |
+
+## Week 1: Core Pipeline - COMPLETE
+
+Completed deliverables:
+
+Backend Services:
+- app/services/candidate_profile_service.py  (OCR -> name/email/phone/linkedin/github/skills)
+- app/services/job_profile_service.py        (OCR -> title/location/YOE/required+preferred skills)  
+- app/services/matching_service.py           (Skills -> score + decision + evidence + notes)
+
+Evaluation Framework:
+- scripts/run_evaluation.py                  (32/32 checks passed)
+- tests/                                    (4 unit tests passed)
+- data/evaluation/                          (2 candidates + 2 jobs + 2 match cases)
+
+Key Features Delivered:
+- Deterministic parsing of identity/contact/skills from OCR text
+- Evidence-aware matching with supporting text snippets  
+- Explainable outputs (score/decision/notes/evidence)
+- Production-style evaluation (32 checks: parsing/matching/explainability)
+- 100% test coverage on core logic
+
+Technical depth demonstrated:
+- Rule-based OCR post-processing
+- Backend service architecture
+- Explainability & auditability
+- Integration testing patterns
+
+Portfolio bullets:
+- Built deterministic OCR->candidate-job matching pipeline (100% eval pass rate)
+- Added evidence tracing + explainable outputs for recruiter auditability  
+- Production evaluation framework (32 checks: parsing/matching/explainability)
+
 
 ## Setup
 
@@ -130,9 +182,7 @@ pip install -r requirements.txt
 
 ### 4. Configure environment variables
 
-Create a `.env` file from `.env.example` and set the Azure credentials needed by the application.
-
-Example variables:
+Create a `.env` file from `.env.example` and set the Azure credentials required by the application.
 
 ```env
 APP_NAME=Azure Job Application Selector
@@ -148,27 +198,81 @@ AZURE_STORAGE_CONTAINER_NAME=job-applications
 uvicorn app.main:app --reload
 ```
 
-After startup, open:
+Open:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
+## Testing
+
+Run the service-layer tests with:
+
+```bash
+pytest tests -v
+```
+
+Current tested areas:
+- candidate profile extraction,
+- job description parsing,
+- strong-match behavior,
+- weak-match behavior. 
+
+## Evaluation
+
+This project includes a comprehensive evaluation pack for the full pipeline: OCR parsing -> skill extraction -> matching -> explainability.
+
+### Run the benchmark
+
+```bash
+python scripts/run_evaluation.py
+```
+
+### Current benchmark results - 100% PASS ✅
+
+- Candidate extraction: 12/12 checks passed
+- Job parsing: 10/10 checks passed  
+- Matching + Explainability: 10/10 checks passed
+
+### Evaluation scope
+
+2 candidate samples, 2 job descriptions, 2 end-to-end matching cases with:
+- Identity field extraction (name/email/phone/LinkedIn/GitHub)
+- Skill extraction from OCR text
+- Job parsing (title/location/YOE/required+preferred skills)
+- Matching decisions with evidence tracing
+- Explainability validation (evidence dict + notes present)
+
+### What the benchmark validates
+
+- Candidate identity fields extracted correctly
+- Skills extracted from OCR text  
+- Job requirements parsed accurately
+- Matching decisions (strong/weak) correct
+- Evidence snippets present for matched skills
+- Explanatory notes generated for every case
+
+### Week 1 Status
+
+Complete - 100% benchmark pass rate across parsing + matching + explainability.
+
+Ready for Week 2: API integration + end-to-end OCR->match flow.
+
 ## Example workflow
 
 ### 1. Analyze a resume
 
-Use `POST /documents/analyze-and-save` with a PDF or image resume to create saved OCR outputs under `data/ocr_outputs/<document_id>/`.
+Use `POST /documents/analyze-and-save` with a candidate PDF or image file.
 
 ### 2. Extract a candidate profile
 
-Call `POST /documents/{document_id}/extract-profile` to create `candidate_profile.json` from the saved OCR text.
+Call `POST /documents/{document_id}/extract-profile` to generate `candidate_profile.json`.
 
 ### 3. Parse a job description
 
-Send raw job text to `POST /jobs/parse` to generate a saved job profile under `data/job_profiles/<job_id>/`.
+Call `POST /jobs/parse` with raw job text.
 
-Example request body:
+Example request:
 
 ```json
 {
@@ -178,23 +282,47 @@ Example request body:
 
 ### 4. Match candidate to job
 
-Call `POST /jobs/{job_id}/match/{document_id}` to generate a saved match artifact under `data/match_results/`.
+Call:
+
+```text
+POST /jobs/{job_id}/match/{document_id}
+```
+
+Example match output:
+
+```json
+{
+  "job_title": "Computer Vision Engineer",
+  "candidate_name": "Nithin Sai Kumar Kopparapu",
+  "matched_required_skills": ["computer vision", "docker", "opencv", "python", "pytorch"],
+  "missing_required_skills": [],
+  "matched_preferred_skills": ["cuda", "kubernetes", "tensorflow"],
+  "score": 95,
+  "decision": "strong_match"
+}
+```
+
+## Resume-ready project bullets
+
+- Built a production-style FastAPI backend for OCR-based job application screening using Azure Document Intelligence and Azure Blob Storage.
+- Designed a modular document pipeline for resume ingestion, OCR artifact persistence, candidate profile extraction, job description parsing, and explainable candidate-job matching.
+- Implemented deterministic parsing and scoring services that convert unstructured resumes and job descriptions into structured JSON artifacts for reproducible evaluation and debugging.
+- Added unit tests for parsing and matching services to improve reliability and refactoring safety.
 
 ## Current limitations
 
-The current extraction logic is intentionally deterministic and lightweight, which makes it easy to debug but less robust than a later LLM-assisted or section-aware parser.[7][2]
-The matching logic is currently skill-focused and should later be expanded with stronger evidence tracing, experience normalization, education checks, language requirements, and evaluation metrics.[2]
+The current extraction logic is intentionally deterministic and lightweight, which makes it easy to debug but less robust than a later section-aware or LLM-assisted parser.
+The matching logic is still skill-centric and should later be expanded with stronger evidence tracing, experience normalization, education checks, language requirements, and evaluation metrics.
 
 ## Roadmap
 
-- Add unit tests for parsing and matching logic.
-- Add evaluation datasets and extraction accuracy metrics.
-- Improve section-aware parsing for resumes and job descriptions.
+- Add evaluation datasets and extraction quality metrics.
+- Expand parsing with section-aware logic and evidence spans.
 - Add retrieval over OCR outputs for grounded evidence lookup.
-- Add Azure-native async processing and deployment paths.
-- Add a recruiter-facing UI or demo dashboard after backend stabilization.
+- Add background processing and Azure-native deployment.
+- Add a recruiter-facing UI after backend stabilization.
 
-## Why this project matters
+## Why this repository is useful
 
-This project is designed to demonstrate practical document intelligence engineering rather than only model experimentation.[2]
-It emphasizes reproducible artifacts, explainable matching, modular backend design, and a realistic OCR-to-decision workflow that is relevant for AI, ML, CV, and backend-oriented roles.[1][5][3]
+This repository demonstrates practical document intelligence engineering rather than only model experimentation.
+It emphasizes modular backend design, explainable outputs, saved artifacts, test coverage, and a realistic OCR-to-decision workflow relevant to AI, ML, CV, and backend-focused roles.

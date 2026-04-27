@@ -60,9 +60,9 @@ class JobProfileService:
 
     def _extract_location(self, text: str) -> str | None:
         patterns = [
-            r"(?im)^location:\s*([^\n\r]+)",
-            r"(?im)^based in:\s*([^\n\r]+)",
-            r"(?im)^job location:\s*([^\n\r]+)",
+            r"(?im)^\s*location:\s*([^\n\r]+)",
+            r"(?im)^\s*based in:\s*([^\n\r]+)",
+            r"(?im)^\s*job location:\s*([^\n\r]+)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text)

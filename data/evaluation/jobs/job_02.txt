@@ -1,0 +1,5 @@
+NLP Engineer
+Location: Germany
+We need an NLP Engineer with 3 years of experience.
+Required skills include Python, NLP, SQL, and Git.
+Preferred skills include FastAPI and Docker.

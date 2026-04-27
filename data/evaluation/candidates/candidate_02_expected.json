@@ -1,0 +1,8 @@
+{
+  "name": "Alice Martin",
+  "email": "alice.martin@example.com",
+  "phone_contains": null,
+  "linkedin_contains": null,
+  "github_contains": "github.com/alicemartin",
+  "skills_expected": ["machine learning", "nlp", "python", "fastapi", "docker", "sql", "git"]
+}

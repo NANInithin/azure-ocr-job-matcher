@@ -1,0 +1,6 @@
+{
+  "candidate_file": "candidate_01.txt",
+  "job_file": "job_01.txt",
+  "expected_decision": "strong_match",
+  "expected_required_skills_present": ["python", "pytorch", "opencv", "docker", "computer vision"]
+}
