@@ -1,10 +1,51 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
-.env
-.pytest_cache/
-.idea/
-.vscode/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
 
-data/ocr_outputs/
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Test / coverage / cache
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+logs/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Local generated artifacts
 data/uploads/
+data/ocr_outputs/
+data/job_profiles/
+data/match_results/
+
+# Optional local experiments
+tmp/
+temp/
