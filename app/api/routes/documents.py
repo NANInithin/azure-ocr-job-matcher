@@ -61,15 +61,14 @@ async def analyze_document(file: UploadFile = File(...)):
     content = await file.read()
 
     docintel_service = DocumentIntelligenceService()
-    result = docintel_service.analyze_read_from_bytes(content)
-
-    full_text = result.content if hasattr(result, "content") else ""
+    analysis = docintel_service.analyze_from_bytes(content)
 
     return {
         "filename": file.filename,
         "content_type": file.content_type,
-        "model_id": result.model_id,
-        "full_text": full_text[:4000]
+        "model_id": analysis["model_id"],
+        "full_text": analysis["full_text"][:4000],
+        "page_count": analysis["page_count"],
     }
 
 @router.post("/analyze-and-save")
@@ -78,13 +77,11 @@ async def analyze_and_save_document(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
 
     original_name = file.filename or "unknown"
-    extension = Path(original_name).suffix
     document_id = str(uuid4())
-
     content = await file.read()
 
     docintel_service = DocumentIntelligenceService()
-    analysis = docintel_service.analyze_read_from_bytes(content)
+    analysis = docintel_service.analyze_from_bytes(content)
 
     output_dir = Path("data/ocr_outputs") / document_id
     output_dir.mkdir(parents=True, exist_ok=True)

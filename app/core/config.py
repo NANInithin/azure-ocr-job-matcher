@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     azure_storage_container_raw: str = "raw-documents"
     azure_document_intelligence_endpoint: str = ""
     azure_document_intelligence_key: str = ""
+    azure_document_intelligence_model: str = "prebuilt-layout"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
