@@ -27,13 +27,11 @@ class JobProfileService:
             start_keywords=["required", "requirements", "must have", "minimum qualifications", "qualifications"],
             stop_keywords=["preferred", "nice to have", "good to have", "bonus", "benefits", "about us"]
         )
-
         preferred_section = self._extract_section(
             text=lower_text,
             start_keywords=["preferred", "nice to have", "good to have", "bonus", "preferred qualifications"],
             stop_keywords=["benefits", "about us", "how to apply", "application process"]
         )
-
         fallback_section = self._extract_section(
             text=lower_text,
             start_keywords=["skills", "stack", "technologies", "experience"],
@@ -42,10 +40,8 @@ class JobProfileService:
 
         if not title:
             notes.append("Could not confidently extract job title.")
-
         if not location:
             notes.append("Location not found explicitly in job text.")
-
         if minimum_years_experience is None:
             notes.append("Minimum years of experience not found explicitly.")
 
@@ -78,6 +74,53 @@ class JobProfileService:
             "preferred_skills": sorted(set(preferred_skills)),
             "minimum_years_experience": minimum_years_experience,
             "notes": notes,
+            "field_confidence": self._compute_confidence(
+                title=title,
+                company=company,
+                location=location,
+                required_skills=required_skills,
+                preferred_skills=preferred_skills,
+                minimum_years_experience=minimum_years_experience,
+                notes=notes,
+            ),
+        }
+
+    def _compute_confidence(
+        self,
+        title: str | None,
+        company: str | None,
+        location: str | None,
+        required_skills: list[str],
+        preferred_skills: list[str],
+        minimum_years_experience: int | None,
+        notes: list[str],
+    ) -> dict[str, float]:
+        title_conf = 0.7 if title else 0.0
+        company_conf = 0.9 if company else 0.0
+        location_conf = 1.0 if location else 0.0
+
+        inferred = any("inferred" in n.lower() for n in notes)
+        full_text_fallback = any("full job text" in n.lower() for n in notes)
+        n_req = len(required_skills)
+        if n_req == 0:
+            req_conf = 0.0
+        elif full_text_fallback:
+            req_conf = 0.4
+        elif inferred:
+            req_conf = 0.6
+        else:
+            req_conf = 0.85 if n_req >= 3 else 0.7
+
+        pref_conf = 0.8 if preferred_skills else 0.0
+        exp_conf = 0.95 if minimum_years_experience is not None else 0.0
+
+        return {
+            "title": round(title_conf, 2),
+            "company": round(company_conf, 2),
+            "location": round(location_conf, 2),
+            "required_skills": round(req_conf, 2),
+            "preferred_skills": round(pref_conf, 2),
+            "minimum_years_experience": round(exp_conf, 2),
         }
 
     def _extract_title(self, lines: list[str]) -> str | None:
@@ -85,7 +128,6 @@ class JobProfileService:
             "location:", "based in:", "job location:", "about", "company", "team",
             "responsibilities", "requirements", "qualifications", "preferred"
         )
-
         for line in lines[:6]:
             clean = line.strip()
             lower = clean.lower()
@@ -100,8 +142,8 @@ class JobProfileService:
     def _extract_company(self, lines: list[str]) -> str | None:
         patterns = [
             r"(?i)^company:\s*(.+)$",
-            r"(?i)^about\s+([A-Z][A-Za-z0-9&,. \\-]+)$",
-            r"(?i)^join\s+([A-Z][A-Za-z0-9&,. \\-]+)$",
+            r"(?i)^about\s+([A-Z][A-Za-z0-9&,. \-]+)$",
+            r"(?i)^join\s+([A-Z][A-Za-z0-9&,. \-]+)$",
         ]
         for line in lines[:10]:
             for pattern in patterns:
@@ -143,21 +185,16 @@ class JobProfileService:
             idx = text.find(keyword)
             if idx != -1 and (start_idx == -1 or idx < start_idx):
                 start_idx = idx
-
         if start_idx == -1:
             return ""
-
         section = text[start_idx:]
         stop_idx = -1
-
         for keyword in stop_keywords:
             idx = section.find(keyword)
             if idx != -1 and idx > 0 and (stop_idx == -1 or idx < stop_idx):
                 stop_idx = idx
-
         if stop_idx != -1:
             section = section[:stop_idx]
-
         return section[:1500]
 
     def _extract_skills(self, text: str) -> list[str]:
@@ -170,4 +207,4 @@ class JobProfileService:
 
     def _skill_pattern(self, skill: str) -> str:
         escaped = re.escape(skill)
-        return rf"(?<!\\w){escaped}(?!\\w)"
+        return rf"(?<!\w){escaped}(?!\w)"
