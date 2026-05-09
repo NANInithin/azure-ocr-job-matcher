@@ -4,38 +4,39 @@ A production-style OCR and document intelligence backend that analyzes candidate
 
 ## Why this project
 
-This project is being built as an 8-week portfolio system focused on recruiter-visible engineering depth in OCR, backend orchestration, structured extraction, reproducible artifacts, and explainable matching workflows. The backend follows a modular FastAPI structure with routers, schemas, and service layers, which aligns with common FastAPI organization patterns for larger applications. [1]
+This project is being built as an 8-week portfolio system focused on recruiter-visible engineering depth in OCR, backend orchestration, structured extraction, reproducible artifacts, and explainable matching workflows. The backend follows a modular FastAPI structure with routers, schemas, and service layers, which aligns with common FastAPI organization patterns for larger applications.
 
 ## Current status
 
-The current implementation supports candidate OCR processing, candidate profile extraction, job description parsing, saved-profile matching, service-layer unit tests, route-level tests, schema-backed Swagger examples, parser notes for ambiguous job descriptions, and edge-case matcher validation. The project includes reproducible saved artifacts for OCR outputs, job profiles, and match results, which makes debugging and evaluation easier in document intelligence systems. Azure Document Intelligence layout analysis extracts structured document content such as text, lines, paragraphs, tables, and sections, which supports this artifact-driven pipeline design. [2][3][4]
+The current implementation supports candidate OCR processing, candidate profile extraction, job description parsing, saved-profile matching, service-layer unit tests, route-level tests, schema-backed Swagger examples, parser notes for ambiguous job descriptions, and edge-case matcher validation. The project includes reproducible saved artifacts for OCR outputs, job profiles, and match results, which makes debugging and evaluation easier in document intelligence systems.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A[Candidate Resume PDF/Image] --> B[/documents/analyze-and-save/]
+    A[Candidate Resume PDF or Image] --> B[POST /documents/analyze-and-save]
     B --> C[Azure Document Intelligence OCR]
-    C --> D[OCR JSON + text + metadata]
+    C --> D[OCR JSON plus text plus metadata]
 
-    D --> E[/documents/{document_id}/extract-profile/]
+    D --> E[POST /documents/document_id/extract-profile]
     E --> F[Candidate Profile JSON]
 
-    G[Raw Job Description Text] --> H[/jobs/parse/]
-    H --> I[Job Profile JSON + notes]
+    G[Raw Job Description Text] --> H[POST /jobs/parse]
+    H --> I[Job Profile JSON plus notes]
 
-    F --> J[/jobs/{job_id}/match/{document_id}/]
+    F --> J[POST /jobs/job_id/match/document_id]
     I --> J
-    J --> K[Match Result JSON + evidence + notes]
+    J --> K[Match Result JSON plus evidence plus notes]
 ```
 
-The backend is organized so document ingestion, parsing, and matching logic remain separated instead of being coupled inside one script, which makes later extension into evaluation, async processing, and retrieval easier. FastAPI recommends splitting bigger applications into routers and modules, which matches this structure. [1]
+The backend is organized so document ingestion, parsing, and matching logic remain separated instead of being coupled inside one script, which makes later extension into evaluation, async processing, and retrieval easier.
 
 ## Project structure
 
 ```text
 .
 ├── app/
+│   ├── main.py
 │   ├── api/
 │   │   └── routes/
 │   │       ├── health.py
@@ -44,6 +45,7 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 │   ├── core/
 │   │   ├── config.py
 │   │   └── logging.py
+│   ├── models/
 │   ├── schemas/
 │   │   ├── jobs.py
 │   │   └── matching.py
@@ -55,10 +57,15 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 │       └── matching_service.py
 ├── data/
 │   ├── evaluation/
+│   │   ├── candidates/
+│   │   ├── jobs/
+│   │   └── matching/
 │   ├── job_profiles/
 │   ├── match_results/
 │   ├── ocr_outputs/
 │   └── uploads/
+├── scripts/
+│   └── run_evaluation.py
 ├── tests/
 │   ├── conftest.py
 │   ├── test_candidate_profile_service.py
@@ -73,15 +80,15 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 
 ## Features
 
-- Upload candidate documents and process them with Azure Document Intelligence OCR. [2]
+- Upload candidate documents and process them with Azure Document Intelligence OCR.
 - Save OCR artifacts as raw JSON, plain text, and metadata for each document.
 - Extract structured candidate profile fields from OCR output using deterministic parsing rules.
 - Parse raw job descriptions into title, location, skills, years of experience, and parser notes for ambiguous inputs.
 - Match saved candidate profiles against saved job profiles with transparent scoring, evidence snippets, and decision notes.
 - Match saved candidate profiles directly against a structured job payload in Swagger UI.
-- Validate parser and matcher behavior using Pytest unit tests and edge-case scoring tests. [5][6]
-- Validate document-analysis routes with request-level file upload tests using FastAPI TestClient patterns. [7][8]
-- Provide realistic request examples in generated OpenAPI docs through Pydantic schema metadata. [4][9]
+- Validate parser and matcher behavior using Pytest unit tests and edge-case scoring tests.
+- Validate document-analysis routes with request-level file upload tests using FastAPI TestClient patterns.
+- Provide realistic request examples in generated OpenAPI docs through Pydantic schema metadata.
 
 ## Processing flow
 
@@ -129,7 +136,7 @@ Saved candidate profile + structured job payload
 | Testing | Pytest, FastAPI TestClient |
 | Matching | Deterministic skill-based scoring, evidence snippets, and explainable notes |
 
-## Week 1: Core Pipeline - COMPLETE
+## Week 1: Core Pipeline — COMPLETE
 
 Completed deliverables:
 
@@ -161,28 +168,35 @@ Portfolio bullets:
 - Added evidence tracing and explainable outputs for recruiter auditability.
 - Implemented a production-style evaluation framework for parsing, matching, and explainability.
 
-## Week 2: API Integration and Validation
+## Week 2: API Integration and Validation — COMPLETE
 
-Week 1 already delivered the full OCR-to-matching pipeline. Week 2 focuses on hardening that pipeline at the API layer with cleaner route behavior, realistic interactive testing, better schema examples, stronger job-description parsing, and explicit matcher boundary coverage.
+Week 1 already delivered the full OCR-to-matching pipeline. Week 2 focused on hardening that pipeline at the API layer with cleaner route behavior, realistic interactive testing, better schema examples, stronger job-description parsing, and explicit matcher boundary coverage.
 
-Week 2 improvements so far:
-- Added route-level tests for document analysis, OCR artifact persistence, and profile extraction using FastAPI TestClient upload patterns. [7][8]
-- Standardized the Document Intelligence service boundary around a JSON-safe result payload for persistence and downstream parsing. Azure SDK results can be converted with `as_dict()`, which is the right persistence boundary for OCR artifacts. [2]
+Week 2 improvements:
+- Added route-level tests for document analysis, OCR artifact persistence, and profile extraction using FastAPI TestClient upload patterns.
+- Standardized the Document Intelligence service boundary around a JSON-safe result payload for persistence and downstream parsing.
 - Added a direct structured payload matching path for Swagger testing through `/documents/{document_id}/match`.
-- Added realistic request examples to `/jobs/parse` and `/documents/{document_id}/match` using Pydantic schema metadata, which improves the generated OpenAPI docs and reduces placeholder-input errors. [4][9]
+- Added realistic request examples to `/jobs/parse` and `/documents/{document_id}/match` using Pydantic schema metadata.
 - Improved `job_profile_service.py` with better section-aware parsing, fallback skill extraction, and parser notes for ambiguous job descriptions.
-- Added stronger unit tests for structured and unstructured job posts, plus matcher edge cases for strong, moderate, and weak decisions. Edge-case tests are especially valuable for rule-based systems because scoring bugs often appear at decision thresholds. [10][5][6]
+- Added stronger unit tests for structured and unstructured job posts, plus matcher edge cases for strong, moderate, and weak decisions.
 - Verified real interactive OCR-to-match smoke tests using a genuine candidate document and a real structured job payload.
 
-This means Week 2 is not introducing OCR for the first time; it is making the existing system easier to validate, demo, and extend. [1]
+## Week 3: Repo Hygiene and Source-of-Truth Reset — IN PROGRESS
+
+Goals:
+- Verify and document the real repo structure.
+- Sync README with current implementation.
+- Clean up mismatches between chat notes and actual files.
+- Add the next feature only after the current state is confirmed.
+- Keep one clear checkpoint commit per milestone.
 
 ## Setup
 
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repo-url>
-cd <your-repo-folder>
+git clone https://github.com/NANInithin/azure-ocr-job-matcher.git
+cd azure-ocr-job-matcher
 ```
 
 ### 2. Create and activate a virtual environment
@@ -271,14 +285,6 @@ Two candidate samples, two job descriptions, and two end-to-end matching cases v
 - evidence snippets,
 - explanatory notes.
 
-### Saved sample cases
-
-Store demo-ready examples under `data/evaluation/sample_cases/`:
-- `sample_job_requirements.json`
-- `sample_match_result.json`
-
-These samples make the repo easier to demo without manually rebuilding a job payload from scratch every time.
-
 ## Example workflow
 
 ### 1. Analyze a resume
@@ -297,23 +303,17 @@ Example request:
 
 ```json
 {
-  "job_text": "Computer Vision Engineer
-Location: France
-We are looking for a Computer Vision Engineer with 2+ years of experience. Required skills include Python, PyTorch, OpenCV, Docker, and computer vision. Preferred skills include Azure, Kubernetes, CUDA, and TensorFlow."
+  "job_text": "Computer Vision Engineer\nLocation: France\nWe are looking for a Computer Vision Engineer with 2+ years of experience. Required skills include Python, PyTorch, OpenCV, Docker, and computer vision. Preferred skills include Azure, Kubernetes, CUDA, and TensorFlow."
 }
 ```
 
 ### 4. Match candidate to a saved job profile
-
-Call:
 
 ```text
 POST /jobs/{job_id}/match/{document_id}
 ```
 
 ### 5. Match candidate directly to a structured job payload
-
-Call:
 
 ```text
 POST /documents/{document_id}/match
@@ -360,7 +360,7 @@ The current extraction logic is intentionally deterministic and lightweight, whi
 
 ## Roadmap
 
-- Add automatic parsing of raw job text into structured request examples for easier matching demos.
+- Add artifact listing endpoints for saved OCR outputs, job profiles, and match results.
 - Expand parsing with section-aware logic and richer evidence spans.
 - Add retrieval over OCR outputs for grounded evidence lookup.
 - Add background processing and Azure-native deployment.
