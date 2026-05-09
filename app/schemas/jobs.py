@@ -34,3 +34,4 @@ class JobProfile(BaseModel):
     raw_job_text_path: str
     job_profile_path: str
     status: str
+    notes: List[str] = Field(default_factory=list)

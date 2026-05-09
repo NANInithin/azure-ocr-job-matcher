@@ -58,3 +58,19 @@ Any exposure to image focused generative AI is a bonus.
     assert result["title"] == "Computer Vision/AI Engineer"
     assert "pytorch" in result["required_skills"]
     assert "computer vision" in result["required_skills"]
+
+def test_parse_job_text_adds_notes_for_ambiguous_input():
+    service = JobProfileService()
+
+    job_text = """
+We are hiring an AI engineer to work on vision models.
+Hands-on experience with PyTorch and computer vision is valuable.
+Cloud exposure is a plus.
+"""
+
+    result = service.parse_job_text(job_text)
+
+    assert isinstance(result["notes"], list)
+    assert len(result["notes"]) > 0
+    assert any("Location not found" in note for note in result["notes"])
+    assert any("Minimum years of experience not found" in note for note in result["notes"])

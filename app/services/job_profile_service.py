@@ -15,6 +15,7 @@ class JobProfileService:
         text = job_text.strip()
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         lower_text = text.lower()
+        notes = []
 
         title = self._extract_title(lines)
         company = self._extract_company(lines)
@@ -35,21 +36,39 @@ class JobProfileService:
 
         fallback_section = self._extract_section(
             text=lower_text,
-            start_keywords=["skills", "stack", "technologies"],
+            start_keywords=["skills", "stack", "technologies", "experience"],
             stop_keywords=["benefits", "about us", "how to apply"]
         )
+
+        if not title:
+            notes.append("Could not confidently extract job title.")
+
+        if not location:
+            notes.append("Location not found explicitly in job text.")
+
+        if minimum_years_experience is None:
+            notes.append("Minimum years of experience not found explicitly.")
 
         if required_section:
             required_skills = self._extract_skills(required_section)
         elif fallback_section:
             required_skills = self._extract_skills(fallback_section)
+            notes.append("Required skills inferred from a general skills/experience section.")
         else:
             required_skills = self._extract_skills(lower_text)
+            notes.append("Required skills inferred from full job text because no explicit requirements section was found.")
 
-        preferred_skills = self._extract_skills(preferred_section) if preferred_section else []
+        if preferred_section:
+            preferred_skills = self._extract_skills(preferred_section)
+        else:
+            preferred_skills = []
+            notes.append("No explicit preferred-skills section found.")
 
         preferred_set = set(preferred_skills)
         required_skills = [skill for skill in required_skills if skill not in preferred_set]
+
+        if not required_skills:
+            notes.append("No known skills matched from the parser skill list.")
 
         return {
             "title": title,
@@ -58,6 +77,7 @@ class JobProfileService:
             "required_skills": sorted(set(required_skills)),
             "preferred_skills": sorted(set(preferred_skills)),
             "minimum_years_experience": minimum_years_experience,
+            "notes": notes,
         }
 
     def _extract_title(self, lines: list[str]) -> str | None:
@@ -80,8 +100,8 @@ class JobProfileService:
     def _extract_company(self, lines: list[str]) -> str | None:
         patterns = [
             r"(?i)^company:\s*(.+)$",
-            r"(?i)^about\s+([A-Z][A-Za-z0-9&,. \-]+)$",
-            r"(?i)^join\s+([A-Z][A-Za-z0-9&,. \-]+)$",
+            r"(?i)^about\s+([A-Z][A-Za-z0-9&,. \\-]+)$",
+            r"(?i)^join\s+([A-Z][A-Za-z0-9&,. \\-]+)$",
         ]
         for line in lines[:10]:
             for pattern in patterns:
@@ -105,10 +125,11 @@ class JobProfileService:
 
     def _extract_years_experience(self, text: str) -> int | None:
         patterns = [
-            r"(\d+)\+?\s+years? of experience",
-            r"minimum of (\d+)\s+years?",
-            r"(\d+)\+?\s+years? in",
-            r"(\d+)\s*-\s*\d+\s+years? of experience",
+            r"(\d+)\+?\s+years?\s+of\s+experience",
+            r"minimum of\s+(\d+)\s+years?\s+experience",
+            r"minimum of\s+(\d+)\s+years?",
+            r"(\d+)\+?\s+years?\s+in",
+            r"(\d+)\s*-\s*\d+\s+years?\s+of\s+experience",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
@@ -116,12 +137,7 @@ class JobProfileService:
                 return int(match.group(1))
         return None
 
-    def _extract_section(
-        self,
-        text: str,
-        start_keywords: list[str],
-        stop_keywords: list[str]
-    ) -> str:
+    def _extract_section(self, text: str, start_keywords: list[str], stop_keywords: list[str]) -> str:
         start_idx = -1
         for keyword in start_keywords:
             idx = text.find(keyword)
@@ -154,4 +170,4 @@ class JobProfileService:
 
     def _skill_pattern(self, skill: str) -> str:
         escaped = re.escape(skill)
-        return rf"(?<!\w){escaped}(?!\w)"
+        return rf"(?<!\\w){escaped}(?!\\w)"
