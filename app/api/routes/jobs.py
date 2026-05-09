@@ -74,3 +74,23 @@ async def match_saved_job_to_candidate(job_id: str, document_id: str):
 
     output["match_result_path"] = str(match_file)
     return output
+
+
+@router.get(
+    "/{job_id}/match/{document_id}",
+    summary="Retrieve a previously saved match result",
+)
+def get_saved_match(job_id: str, document_id: str):
+    """
+    Returns the saved match result JSON for a given job_id and document_id pair.
+    Raises 404 if the match has not been computed yet.
+    """
+    match_file = Path("data/match_results") / f"{document_id}__{job_id}.json"
+
+    if not match_file.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"No saved match found for document_id={document_id} and job_id={job_id}. Run POST /jobs/{job_id}/match/{document_id} first.",
+        )
+
+    return json.loads(match_file.read_text(encoding="utf-8"))
