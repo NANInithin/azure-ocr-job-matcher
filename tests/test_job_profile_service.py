@@ -1,32 +1,60 @@
 from app.services.job_profile_service import JobProfileService
 
 
-def test_parse_job_text_required_and_preferred_skills():
-    text = """
-    Computer Vision Engineer
-    Location: France
-
-    We are looking for a Computer Vision Engineer with 2+ years of experience.
-    Required skills include Python, PyTorch, OpenCV, Docker, and computer vision.
-    Preferred skills include Azure, Kubernetes, CUDA, and TensorFlow.
-    """
-
+def test_parse_job_text_extracts_required_and_preferred_sections():
     service = JobProfileService()
-    job = service.parse_job_text(text)
 
-    assert job["title"] == "Computer Vision Engineer"
-    assert job["location"] == "France"
-    assert job["minimum_years_experience"] == 2
+    job_text = """
+Computer Vision Engineer
+Company: Industrial Vision AI
+Location: France
 
-    assert "python" in job["required_skills"]
-    assert "pytorch" in job["required_skills"]
-    assert "opencv" in job["required_skills"]
-    assert "docker" in job["required_skills"]
-    assert "computer vision" in job["required_skills"]
+Required Qualifications:
+Python, PyTorch, OpenCV, Docker, Computer Vision, Deep Learning
+Minimum of 2 years experience
 
-    assert "azure" in job["preferred_skills"]
-    assert "kubernetes" in job["preferred_skills"]
-    assert "cuda" in job["preferred_skills"]
-    assert "tensorflow" in job["preferred_skills"]
+Preferred Qualifications:
+Azure, Kubernetes, CUDA, TensorFlow
+"""
 
-    assert "azure" not in job["required_skills"]
+    result = service.parse_job_text(job_text)
+
+    assert result["title"] == "Computer Vision Engineer"
+    assert result["company"] == "Industrial Vision AI"
+    assert result["location"] == "France"
+    assert result["minimum_years_experience"] == 2
+
+    assert "python" in result["required_skills"]
+    assert "pytorch" in result["required_skills"]
+    assert "opencv" in result["required_skills"]
+    assert "docker" in result["required_skills"]
+    assert "computer vision" in result["required_skills"]
+    assert "deep learning" in result["required_skills"]
+
+    assert "azure" in result["preferred_skills"]
+    assert "kubernetes" in result["preferred_skills"]
+    assert "cuda" in result["preferred_skills"]
+    assert "tensorflow" in result["preferred_skills"]
+
+    assert not set(result["required_skills"]) & set(result["preferred_skills"])
+
+def test_parse_job_text_falls_back_to_general_skill_extraction():
+    service = JobProfileService()
+
+    job_text = """
+About the job
+Computer Vision/AI Engineer
+
+Amsterdam, Netherlands
+
+Strong Python skills and hands on use of PyTorch.
+Practical experience with computer vision fundamentals, including object detection or image processing.
+Exposure to cloud platforms such as AWS or GCP is beneficial.
+Any exposure to image focused generative AI is a bonus.
+"""
+
+    result = service.parse_job_text(job_text)
+
+    assert result["title"] == "Computer Vision/AI Engineer"
+    assert "pytorch" in result["required_skills"]
+    assert "computer vision" in result["required_skills"]
