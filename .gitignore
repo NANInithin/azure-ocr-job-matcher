@@ -77,3 +77,8 @@ artifacts/
 
 # Frontend/node leftovers if added later
 node_modules/
+
+
+!.env.example
+
+*.pfx
