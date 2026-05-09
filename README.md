@@ -8,7 +8,7 @@ This project is being built as an 8-week portfolio system focused on recruiter-v
 
 ## Current status
 
-The current implementation supports candidate OCR processing, candidate profile extraction, job description parsing, saved-profile matching, service-layer unit tests, route-level tests, schema-backed Swagger examples, parser notes for ambiguous job descriptions, and edge-case matcher validation. The project includes reproducible saved artifacts for OCR outputs, job profiles, and match results, which makes debugging and evaluation easier in document intelligence systems.
+The current implementation supports candidate OCR processing, candidate profile extraction, job description parsing, saved-profile matching, artifact registry endpoints, field confidence scoring on all extracted outputs, service-layer unit tests, route-level tests, schema-backed Swagger examples, parser notes for ambiguous job descriptions, and edge-case matcher validation. The project includes reproducible saved artifacts for OCR outputs, job profiles, and match results, which makes debugging and evaluation easier in document intelligence systems.
 
 ## Architecture
 
@@ -19,14 +19,17 @@ flowchart TD
     C --> D[OCR JSON plus text plus metadata]
 
     D --> E[POST /documents/document_id/extract-profile]
-    E --> F[Candidate Profile JSON]
+    E --> F[Candidate Profile JSON with confidence scores]
 
     G[Raw Job Description Text] --> H[POST /jobs/parse]
-    H --> I[Job Profile JSON plus notes]
+    H --> I[Job Profile JSON with confidence scores]
 
     F --> J[POST /jobs/job_id/match/document_id]
     I --> J
     J --> K[Match Result JSON plus evidence plus notes]
+
+    K --> L[GET /registry/summary]
+    L --> M[Artifact counts across documents, jobs, matches]
 ```
 
 The backend is organized so document ingestion, parsing, and matching logic remain separated instead of being coupled inside one script, which makes later extension into evaluation, async processing, and retrieval easier.
@@ -41,7 +44,8 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 │   │   └── routes/
 │   │       ├── health.py
 │   │       ├── documents.py
-│   │       └── jobs.py
+│   │       ├── jobs.py
+│   │       └── registry.py
 │   ├── core/
 │   │   ├── config.py
 │   │   └── logging.py
@@ -60,18 +64,20 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 │   │   ├── candidates/
 │   │   ├── jobs/
 │   │   └── matching/
-│   ├── job_profiles/
-│   ├── match_results/
-│   ├── ocr_outputs/
-│   └── uploads/
+│   ├── job_profiles/         <- gitignored, created at runtime
+│   ├── match_results/        <- gitignored, created at runtime
+│   ├── ocr_outputs/          <- gitignored, created at runtime
+│   └── uploads/              <- gitignored, created at runtime
 ├── scripts/
 │   └── run_evaluation.py
 ├── tests/
 │   ├── conftest.py
 │   ├── test_candidate_profile_service.py
+│   ├── test_confidence_scoring.py
 │   ├── test_documents_route.py
 │   ├── test_job_profile_service.py
-│   └── test_matching_service.py
+│   ├── test_matching_service.py
+│   └── test_registry_route.py
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
@@ -83,9 +89,13 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 - Upload candidate documents and process them with Azure Document Intelligence OCR.
 - Save OCR artifacts as raw JSON, plain text, and metadata for each document.
 - Extract structured candidate profile fields from OCR output using deterministic parsing rules.
+- Attach field-level confidence scores to every extracted candidate profile field.
 - Parse raw job descriptions into title, location, skills, years of experience, and parser notes for ambiguous inputs.
+- Attach field-level confidence scores to every extracted job profile field.
 - Match saved candidate profiles against saved job profiles with transparent scoring, evidence snippets, and decision notes.
 - Match saved candidate profiles directly against a structured job payload in Swagger UI.
+- List all persisted artifacts via registry endpoints with counts, file listings, and profile status flags.
+- Retrieve a summary of all pipeline artifacts in a single registry health call.
 - Validate parser and matcher behavior using Pytest unit tests and edge-case scoring tests.
 - Validate document-analysis routes with request-level file upload tests using FastAPI TestClient patterns.
 - Provide realistic request examples in generated OpenAPI docs through Pydantic schema metadata.
@@ -95,13 +105,13 @@ The backend is organized so document ingestion, parsing, and matching logic rema
 ```text
 Candidate document
   -> /documents/analyze-and-save
-  -> OCR outputs saved
+  -> OCR outputs saved (result.json, text.txt, metadata.json)
   -> /documents/{document_id}/extract-profile
-  -> candidate_profile.json saved
+  -> candidate_profile.json saved (with field_confidence)
 
 Raw job description
   -> /jobs/parse
-  -> job_profile.json saved
+  -> job_profile.json saved (with field_confidence)
 
 Saved candidate profile + saved job profile
   -> /jobs/{job_id}/match/{document_id}
@@ -110,6 +120,12 @@ Saved candidate profile + saved job profile
 Saved candidate profile + structured job payload
   -> /documents/{document_id}/match
   -> direct match response in Swagger/UI
+
+Artifact inspection
+  -> /registry/summary         — total counts across all artifact types
+  -> /registry/documents       — list all OCR document artifact IDs
+  -> /registry/jobs            — list all job profile artifact IDs
+  -> /registry/matches         — list all saved match result files
 ```
 
 ## API endpoints
@@ -121,9 +137,15 @@ Saved candidate profile + structured job payload
 | `/documents/analyze` | POST | Run OCR on an uploaded file and preview extracted text. |
 | `/documents/analyze-and-save` | POST | Run OCR on an uploaded file and save OCR outputs. |
 | `/documents/{document_id}/extract-profile` | POST | Extract and save a candidate profile from OCR text. |
-| `/jobs/parse` | POST | Parse raw job description text and save a job profile with notes. |
-| `/jobs/{job_id}/match/{document_id}` | POST | Match a saved candidate profile to a saved job profile and save the result. |
 | `/documents/{document_id}/match` | POST | Match a saved candidate profile to a structured job payload directly in the docs UI. |
+| `/jobs/parse` | POST | Parse raw job description text and save a job profile with notes and confidence scores. |
+| `/jobs/{job_id}/match/{document_id}` | POST | Match a saved candidate profile to a saved job profile and save the result. |
+| `/registry/summary` | GET | Return total counts of all persisted pipeline artifacts. |
+| `/registry/documents` | GET | List all saved OCR document artifact IDs and their files. |
+| `/registry/documents/{document_id}` | GET | Get artifact file details for a specific document ID. |
+| `/registry/jobs` | GET | List all saved job profile artifact IDs and their files. |
+| `/registry/jobs/{job_id}` | GET | Get artifact file details for a specific job profile ID. |
+| `/registry/matches` | GET | List all saved match result files. |
 
 ## Tech stack
 
@@ -133,6 +155,7 @@ Saved candidate profile + structured job payload
 | OCR | Azure Document Intelligence |
 | Storage | Azure Blob Storage, local artifact folders |
 | Parsing | Python regex and rule-based extraction |
+| Confidence scoring | Heuristic field-level confidence (0.0–1.0) on all extracted fields |
 | Testing | Pytest, FastAPI TestClient |
 | Matching | Deterministic skill-based scoring, evidence snippets, and explainable notes |
 
@@ -157,12 +180,6 @@ Key features delivered:
 - Production-style evaluation across parsing, matching, and explainability.
 - Strong service-level test coverage for core logic.
 
-Technical depth demonstrated:
-- Rule-based OCR post-processing.
-- Backend service architecture.
-- Explainability and auditability.
-- Evaluation-driven development.
-
 Portfolio bullets:
 - Built a deterministic OCR-to-candidate-job matching pipeline with full benchmark coverage.
 - Added evidence tracing and explainable outputs for recruiter auditability.
@@ -181,14 +198,21 @@ Week 2 improvements:
 - Added stronger unit tests for structured and unstructured job posts, plus matcher edge cases for strong, moderate, and weak decisions.
 - Verified real interactive OCR-to-match smoke tests using a genuine candidate document and a real structured job payload.
 
-## Week 3: Repo Hygiene and Source-of-Truth Reset — IN PROGRESS
+## Week 3: Artifact Registry, Confidence Scoring, and Read Path — IN PROGRESS
 
-Goals:
-- Verify and document the real repo structure.
-- Sync README with current implementation.
-- Clean up mismatches between chat notes and actual files.
-- Add the next feature only after the current state is confirmed.
-- Keep one clear checkpoint commit per milestone.
+Week 3 focused on repo hygiene, source-of-truth reset, and two production-depth features that improve observability and output trustworthiness.
+
+Completed milestones:
+- Audited and synced repo structure, README, and `.gitignore` to match the actual state of the codebase.
+- Untracked all generated runtime data folders from git while preserving evaluation fixtures.
+- Added `app/api/routes/registry.py` with 6 endpoints covering artifact listing, detail retrieval, and a summary health call across documents, jobs, and matches.
+- Added `field_confidence` scoring to both `candidate_profile_service.py` and `job_profile_service.py` — every extracted field now carries a heuristic confidence float (0.0–1.0) based on extraction method reliability.
+- Added `tests/test_registry_route.py` (8 tests) and `tests/test_confidence_scoring.py` (14 tests).
+- Full test suite: 34/34 passing across 6 test files.
+
+In progress:
+- Saved match retrieval endpoint — `GET /jobs/{job_id}/match/{document_id}` to read a previously saved match from disk without re-running.
+- Evaluation harness — `scripts/run_evaluation.py` scored against fixture resumes with expected outputs.
 
 ## Setup
 
@@ -247,6 +271,8 @@ pytest tests -v
 
 Current tested areas:
 - candidate profile extraction,
+- field confidence scoring for candidate profiles,
+- field confidence scoring for job profiles,
 - job description parsing for structured inputs,
 - job description parsing for fallback/unstructured inputs,
 - parser notes for ambiguous inputs,
@@ -257,7 +283,10 @@ Current tested areas:
 - matching with preferred-only skills,
 - document analysis route behavior,
 - OCR artifact save flow,
-- profile extraction from saved OCR text.
+- profile extraction from saved OCR text,
+- artifact registry listing (documents, jobs, matches),
+- artifact registry 404 handling,
+- registry summary counts.
 
 ## Evaluation
 
@@ -293,7 +322,7 @@ Use `POST /documents/analyze-and-save` with a candidate PDF or image file.
 
 ### 2. Extract a candidate profile
 
-Call `POST /documents/{document_id}/extract-profile` to generate `candidate_profile.json`.
+Call `POST /documents/{document_id}/extract-profile` to generate `candidate_profile.json` with field confidence scores.
 
 ### 3. Parse a job description
 
@@ -333,17 +362,24 @@ Example payload:
 }
 ```
 
-Example match output:
+### 6. Inspect persisted artifacts
+
+```text
+GET /registry/summary
+GET /registry/documents
+GET /registry/documents/{document_id}
+GET /registry/jobs
+GET /registry/matches
+```
+
+Example summary response:
 
 ```json
 {
-  "job_title": "Computer Vision Engineer",
-  "candidate_name": "Nithin Sai Kumar Kopparapu",
-  "matched_required_skills": ["computer vision", "docker", "opencv", "python", "pytorch"],
-  "missing_required_skills": [],
-  "matched_preferred_skills": ["cuda", "kubernetes", "tensorflow"],
-  "score": 95,
-  "decision": "strong_match"
+  "total_documents": 10,
+  "documents_with_profile": 6,
+  "total_jobs": 5,
+  "total_matches": 1
 }
 ```
 
@@ -351,16 +387,19 @@ Example match output:
 
 - Built a production-style FastAPI backend for OCR-based job application screening using Azure Document Intelligence and Azure Blob Storage.
 - Designed a modular document pipeline for resume ingestion, OCR artifact persistence, candidate profile extraction, job description parsing, and explainable candidate-job matching.
-- Implemented deterministic parsing and scoring services that convert unstructured resumes and job descriptions into structured JSON artifacts for reproducible evaluation and debugging.
-- Added unit, route-level, and edge-case tests for parsing, matching, and OCR-related API flows.
+- Implemented deterministic parsing and scoring services that convert unstructured resumes and job descriptions into structured JSON artifacts with per-field confidence scores for reproducible evaluation and debugging.
+- Added artifact registry endpoints for real-time inspection of all pipeline outputs — documents processed, profiles extracted, jobs parsed, and matches saved.
+- Added unit, route-level, and edge-case tests for parsing, matching, confidence scoring, and OCR-related API flows — 34 tests passing across 6 test files.
 
 ## Current limitations
 
-The current extraction logic is intentionally deterministic and lightweight, which makes it easy to debug but less robust than a later section-aware or LLM-assisted parser. The matching logic is still skill-centric and should later be expanded with stronger evidence tracing, experience normalization, education checks, language requirements, and evaluation metrics.
+The current extraction logic is intentionally deterministic and lightweight, which makes it easy to debug but less robust than a later section-aware or LLM-assisted parser. The matching logic is still skill-centric and should later be expanded with stronger evidence tracing, experience normalization, education checks, language requirements, and evaluation metrics. Confidence scores are heuristic and not calibrated against ground-truth labels.
 
 ## Roadmap
 
-- Add artifact listing endpoints for saved OCR outputs, job profiles, and match results.
+- Add saved match retrieval endpoint to read previously computed results without re-running the pipeline.
+- Expand evaluation harness with fixture-based scoring and pass/fail thresholds.
+- Add async batch processing for multiple document uploads.
 - Expand parsing with section-aware logic and richer evidence spans.
 - Add retrieval over OCR outputs for grounded evidence lookup.
 - Add background processing and Azure-native deployment.
@@ -368,4 +407,4 @@ The current extraction logic is intentionally deterministic and lightweight, whi
 
 ## Why this repository is useful
 
-This repository demonstrates practical document intelligence engineering rather than only model experimentation. It emphasizes modular backend design, explainable outputs, saved artifacts, test coverage, and a realistic OCR-to-decision workflow relevant to AI, ML, CV, and backend-focused roles.
+This repository demonstrates practical document intelligence engineering rather than only model experimentation. It emphasizes modular backend design, explainable outputs, field-level confidence scoring, saved artifacts, test coverage, and a realistic OCR-to-decision workflow relevant to AI, ML, CV, and backend-focused roles.
